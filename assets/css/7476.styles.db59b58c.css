@@ -1,0 +1,13 @@
+
+html, body {
+    height: 100%;
+    margin: 0; /* 确保没有默认的外边距 */
+}
+.vp-blog-hero-description {
+  background: linear-gradient(90deg, #ff6f61, #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+
+
