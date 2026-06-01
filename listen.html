@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LISTEN — FIELD ARCHIVE</title>
+  <title>LISTEN — Sinthome FIELD</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400&family=Courier+Prime&display=swap" rel="stylesheet">
@@ -12,16 +12,16 @@
 
     :root {
       --bg:       #050a14;
-      --bg2:      #080e1c;
       --teal:     #7dd3c8;
       --teal2:    #4ab5a8;
-      --gold:     #c8a84b;
       --text:     #dce8f2;
       --dim:      #576170;
-      --dim2:     #3a4455;
       --panel:    rgba(5, 10, 22, 0.92);
       --border:   rgba(125, 211, 200, 0.18);
       --border2:  rgba(125, 211, 200, 0.07);
+      --audio-level: 0;
+      --audio-bass: 0;
+      --audio-mid: 0;
     }
 
     html, body {
@@ -31,6 +31,17 @@
       color: var(--text);
       font-family: 'Rajdhani', 'Noto Sans SC', sans-serif;
       -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: -18%; z-index: 1; pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 56%, rgba(125,211,200,calc(0.04 + var(--audio-level) * 0.24)), transparent 28%),
+        radial-gradient(circle at 50% 70%, rgba(74,181,168,calc(0.03 + var(--audio-bass) * 0.18)), transparent 32%);
+      opacity: calc(0.45 + var(--audio-level) * 0.45);
+      mix-blend-mode: screen;
+      transition: opacity 0.16s linear;
     }
 
     /* ── Canvas ─────────────────────────────────── */
@@ -71,6 +82,7 @@
       z-index: 2; pointer-events: none;
     }
     #hud-dashes { animation: spin-hud 60s linear infinite; transform-origin: 250px 250px; }
+    #hud { filter: drop-shadow(0 0 calc(4px + var(--audio-level) * 18px) rgba(125,211,200,0.16)); }
     @keyframes spin-hud { to { transform: rotate(360deg); } }
 
     /* ── Page header ─────────────────────────────── */
@@ -120,9 +132,10 @@
       border-left: 1px solid var(--border);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      transition: transform 0.4s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 calc(24px + var(--audio-level) * 46px) rgba(74,181,168,calc(0.05 + var(--audio-level) * 0.18));
+      transition: box-shadow 0.18s linear, border-color 0.25s ease;
     }
-    #player.hidden { transform: translateX(100%); }
+    #player.playing { border-color: rgba(125,211,200,0.34); }
 
     /* now-playing row */
     .np {
@@ -137,6 +150,12 @@
       position: relative; overflow: hidden;
       background: rgba(125,211,200,0.04);
     }
+    .art-cover {
+      position: absolute; inset: 0;
+      object-fit: cover; width: 100%; height: 100%;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .art-cover.loaded { opacity: 1; }
     .art-ring {
       position: absolute; inset: 0;
       border: 1.5px solid transparent;
@@ -147,12 +166,44 @@
       animation: art-spin 2.4s linear infinite;
     }
     @keyframes art-spin { to { transform: rotate(360deg); } }
-    #player.playing .art-ring { opacity: 0.6; }
+    #player.playing .art-ring { opacity: calc(0.45 + var(--audio-level) * 0.45); }
     .art-icon {
       font-size: 18px; color: var(--teal); z-index: 1;
       font-family: 'Courier Prime', monospace;
       line-height: 1;
+      transform: scale(calc(1 + var(--audio-bass) * 0.18));
+      text-shadow: 0 0 calc(4px + var(--audio-level) * 12px) rgba(125,211,200,0.7);
+      transition: transform 0.08s linear;
     }
+
+    .spectrum {
+      height: 38px; margin: 0 20px 2px;
+      display: grid; grid-template-columns: repeat(32, 1fr);
+      align-items: end; gap: 3px;
+      padding: 9px 0 5px;
+      border-bottom: 1px solid var(--border2);
+    }
+    .spec-bar {
+      height: 3px; min-height: 3px; border-radius: 999px;
+      background: linear-gradient(to top, var(--teal2), var(--teal));
+      opacity: 0.18;
+      box-shadow: 0 0 0 rgba(125,211,200,0);
+      transition: height 0.08s linear, opacity 0.12s linear, box-shadow 0.12s linear;
+    }
+    #player.playing .spec-bar {
+      opacity: calc(0.25 + var(--audio-level) * 0.65);
+      box-shadow: 0 0 calc(2px + var(--audio-level) * 9px) rgba(125,211,200,0.35);
+    }
+
+    .fx-status {
+      padding: 0 20px 9px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px; letter-spacing: 1.6px;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+    .fx-status.live { color: var(--teal2); }
+    .fx-status.warn { color: #d5b56a; }
 
     .np-info { flex: 1; min-width: 0; }
     .np-title {
@@ -170,50 +221,94 @@
     }
 
     /* progress */
-    .progress-wrap { padding: 10px 20px 2px; }
+    .progress-wrap { padding: 14px 20px 4px; }
     .progress-track {
-      width: 100%; height: 2px;
-      background: rgba(255,255,255,0.07);
+      width: 100%; height: 24px;
       cursor: pointer; position: relative;
+      display: flex; align-items: center;
     }
+    .progress-track::before {
+      content: ''; position: absolute;
+      left: 0; right: 0; top: 50%; transform: translateY(-50%);
+      height: 4px; border-radius: 4px;
+      background: rgba(255,255,255,0.10);
+      transition: height 0.15s, background 0.15s;
+    }
+    .progress-track:hover::before { height: 6px; background: rgba(255,255,255,0.14); }
+    .progress-track:active::before { height: 7px; }
     .progress-fill {
-      height: 100%; width: 0%;
+      position: absolute; left: 0; top: 50%;
+      transform: translateY(-50%);
+      height: 4px; width: 0%; border-radius: 4px;
       background: linear-gradient(90deg, var(--teal2), var(--teal));
-      position: relative; transition: width 0.12s linear;
+      transition: width 0.12s linear, height 0.15s;
+      box-shadow: 0 0 calc(4px + var(--audio-level) * 14px) rgba(125,211,200,0.40);
+      pointer-events: none;
     }
+    .progress-track:hover .progress-fill { height: 6px; }
+    .progress-track:active .progress-fill { height: 7px; }
     .progress-fill::after {
       content: '';
-      position: absolute; right: -4px; top: -3px;
-      width: 8px; height: 8px; border-radius: 50%;
+      position: absolute; right: -6px; top: 50%;
+      transform: translateY(-50%) scale(0.6);
+      width: 12px; height: 12px; border-radius: 50%;
       background: var(--teal);
-      box-shadow: 0 0 5px var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+      opacity: 0; transition: opacity 0.15s, transform 0.15s;
     }
+    .progress-track:hover .progress-fill::after {
+      opacity: 1; transform: translateY(-50%) scale(1);
+    }
+    /* seek preview tooltip */
+    .seek-tip {
+      position: absolute; bottom: 28px;
+      background: rgba(5,10,22,0.95);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px; color: var(--teal);
+      letter-spacing: 1.5px;
+      pointer-events: none;
+      opacity: 0; transition: opacity 0.12s;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      border-radius: 2px;
+    }
+    .progress-track:hover .seek-tip { opacity: 1; }
     .time-row {
       display: flex; justify-content: space-between;
       font-family: 'Courier Prime', monospace;
       font-size: 10px; color: var(--dim);
-      margin-top: 6px;
+      margin-top: 0px;
     }
 
     /* controls */
     .controls {
       display: flex; align-items: center;
-      justify-content: center; gap: 12px;
-      padding: 10px 20px 14px;
+      justify-content: center; gap: 8px;
+      padding: 8px 20px 10px;
     }
     .btn {
       background: none; border: none;
       color: var(--dim); cursor: pointer;
-      width: 36px; height: 36px;
+      width: 38px; height: 38px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 16px; transition: color 0.2s, transform 0.1s;
-      font-family: 'Courier Prime', monospace; border-radius: 2px;
+      font-size: 16px; transition: color 0.2s, transform 0.1s, background 0.2s;
+      font-family: 'Courier Prime', monospace; border-radius: 3px;
+      position: relative;
     }
-    .btn:hover { color: var(--teal); }
+    .btn:hover { color: var(--teal); background: rgba(125,211,200,0.05); }
     .btn:active { transform: scale(0.88); }
     .btn.active { color: var(--teal); }
+    /* mode badge on shuffle/order button */
+    .btn .mode-badge {
+      position: absolute; bottom: 2px; right: 2px;
+      font-size: 7px; letter-spacing: 0.5px;
+      color: var(--teal2); font-family: 'Courier Prime', monospace;
+      line-height: 1; pointer-events: none;
+    }
     .btn.play {
-      width: 44px; height: 44px; font-size: 20px;
+      width: 46px; height: 46px; font-size: 20px;
       border: 1px solid var(--border);
       background: rgba(125,211,200,0.04); color: var(--text);
     }
@@ -222,27 +317,102 @@
       background: rgba(125,211,200,0.1); color: var(--teal);
     }
 
+    /* mode indicator row */
+    .mode-row {
+      display: flex; justify-content: center; gap: 4px;
+      padding: 0 16px 10px;
+    }
+    .mode-chip {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase;
+      color: var(--dim2);
+      padding: 5px 10px;
+      border: 1px solid transparent;
+      border-radius: 2px; cursor: pointer;
+      transition: all 0.18s; user-select: none;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      min-width: 52px;
+    }
+    .mode-chip .chip-icon {
+      font-size: 13px; line-height: 1;
+      transition: transform 0.18s;
+    }
+    .mode-chip .chip-lbl {
+      font-size: 7px; letter-spacing: 1px;
+    }
+    .mode-chip:hover {
+      color: var(--dim);
+      border-color: var(--border2);
+      background: rgba(125,211,200,0.04);
+    }
+    .mode-chip:hover .chip-icon { transform: scale(1.15); }
+    .mode-chip.active {
+      color: var(--teal);
+      border-color: rgba(125,211,200,0.30);
+      background: rgba(125,211,200,0.07);
+      box-shadow: 0 0 8px rgba(125,211,200,0.08);
+    }
+    .mode-chip.active .chip-icon { transform: scale(1.08); }
+
     /* volume */
     .vol-row {
       display: flex; align-items: center; gap: 10px;
-      padding: 0 20px 14px;
+      padding: 0 20px 10px;
     }
-    .vol-icon { font-size: 13px; color: var(--dim);
-                font-family: 'Courier Prime', monospace; }
+    .vol-icon { font-size: 15px; color: var(--dim);
+                font-family: 'Courier Prime', monospace;
+                cursor: pointer; transition: color 0.2s; user-select: none;
+                width: 20px; text-align: center; }
+    .vol-icon:hover { color: var(--teal); }
     input[type=range].vol {
-      flex: 1; -webkit-appearance: none; height: 2px;
-      background: rgba(255,255,255,0.09);
-      outline: none; border-radius: 2px; cursor: pointer;
+      flex: 1; -webkit-appearance: none; height: 24px;
+      background: transparent;
+      outline: none; cursor: pointer;
+    }
+    input[type=range].vol::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 4px;
+      background: rgba(255,255,255,0.10);
     }
     input[type=range].vol::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 12px; height: 12px; border-radius: 50%;
+      width: 16px; height: 16px; border-radius: 50%;
       background: var(--teal); cursor: pointer;
-      box-shadow: 0 0 4px var(--teal2);
+      box-shadow: 0 0 6px rgba(125,211,200,0.5);
+      margin-top: -6px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    input[type=range].vol:hover::-webkit-slider-thumb {
+      transform: scale(1.25);
+      box-shadow: 0 0 10px var(--teal);
+    }
+    input[type=range].vol::-moz-range-track {
+      height: 4px; border-radius: 4px;
+      background: rgba(255,255,255,0.10); border: none;
     }
     input[type=range].vol::-moz-range-thumb {
-      width: 12px; height: 12px; border-radius: 50%;
+      width: 16px; height: 16px; border-radius: 50%;
       background: var(--teal); cursor: pointer; border: none;
+      box-shadow: 0 0 6px rgba(125,211,200,0.5);
+    }
+
+    /* keyboard hint row */
+    .keys-row {
+      display: flex; justify-content: center; gap: 12px;
+      padding: 0 20px 10px;
+      border-top: 1px solid var(--border2);
+      padding-top: 8px;
+    }
+    .key-hint {
+      display: flex; align-items: center; gap: 4px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px; color: var(--dim2); letter-spacing: 0.8px;
+    }
+    .key-hint kbd {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 2px; padding: 1px 4px;
+      font-size: 8px; color: var(--dim);
+      font-family: 'Courier Prime', monospace;
     }
 
     /* playlist toggle bar */
@@ -313,21 +483,37 @@
       font-family: 'Courier Prime', monospace;
       font-size: 10px; color: var(--dim); flex-shrink: 0;
     }
-
-    /* toggle button (bottom-right corner) */
-    #tog-btn {
-      position: fixed; bottom: 20px; right: 16px;
-      z-index: 25;
-      display: none; /* shown only when player is hidden on small screens */
-      width: 44px; height: 44px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      color: var(--teal); cursor: pointer; font-size: 20px;
-      align-items: center; justify-content: center;
-      backdrop-filter: blur(12px);
-      transition: background 0.2s;
+    .pl-thumb {
+      width: 28px; height: 28px; flex-shrink: 0;
+      object-fit: cover; border: 1px solid var(--border2);
+      opacity: 0; transition: opacity 0.3s;
     }
-    #tog-btn:hover { background: rgba(125,211,200,0.1); }
+    .pl-thumb.loaded { opacity: 0.75; }
+
+    /* upload button */
+    .upload-row {
+      padding: 0 20px 12px;
+    }
+    .upload-btn {
+      display: flex; align-items: center; justify-content: center;
+      padding: 10px 16px;
+      background: rgba(125,211,200,0.08);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 11px; letter-spacing: 2px; color: var(--teal2);
+      text-transform: uppercase;
+    }
+    .upload-btn:hover {
+      background: rgba(125,211,200,0.15);
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+    .upload-btn span {
+      font-family: 'Rajdhani', sans-serif;
+    }
+
 
     /* corner deco */
     .corner {
@@ -347,8 +533,17 @@
       border-bottom: 1px solid rgba(125,211,200,0.25);
       border-right: 1px solid rgba(125,211,200,0.25); }
 
-    /* NetEase fallback iframe (hidden) */
-    #ne-frame { display: none; }
+
+
+    @media (max-width: 640px) {
+      #hud { width: 94vw; height: 94vw; }
+      .header { top: 24px; left: 22px; }
+      .header-main { font-size: 24px; letter-spacing: 8px; }
+      .header-sub, .header-tag { letter-spacing: 3px; }
+      .center-label { transform: translate(-50%, 35vh); }
+      #player { width: 100%; left: 0; right: 0; }
+      .corner.br { right: 12px; bottom: 238px; opacity: 0.55; }
+    }
   </style>
 </head>
 <body>
@@ -398,15 +593,15 @@
 
 <!-- Page header -->
 <div class="header">
-  <div class="header-sub">ARKNIGHTS: ENDFIELD</div>
+  <div class="header-sub">MACRO FIELD</div>
   <div class="header-main">LISTEN</div>
-  <div class="header-tag">FIELD AUDIO ARCHIVE · TIANSHI NODE</div>
+  <div class="header-tag">SIGNAL / BREATH / MEMORY</div>
 </div>
 
 <!-- Centre bottom label -->
 <div class="center-label">
-  <b>天师桩 · TIANSHI PILLAR</b>
-  <span>PARTICLE FIELD ACTIVE</span>
+  <b>FORM / FIELD</b>
+  <span>BREATHING PARTICLE MAP</span>
 </div>
 
 <!-- Music player -->
@@ -416,6 +611,7 @@
   <div class="np">
     <div class="art">
       <div class="art-ring"></div>
+      <img class="art-cover" id="art-cover" src="" alt="">
       <div class="art-icon">♪</div>
     </div>
     <div class="np-info">
@@ -425,10 +621,15 @@
     <div class="np-idx" id="np-idx">0/0</div>
   </div>
 
+  <!-- Audio reactive spectrum -->
+  <div class="spectrum" id="spectrum" aria-hidden="true"></div>
+  <div class="fx-status" id="fx-status">AUDIO FIELD: STANDBY</div>
+
   <!-- Progress -->
   <div class="progress-wrap">
     <div class="progress-track" id="prog-track">
       <div class="progress-fill" id="prog-fill"></div>
+      <div class="seek-tip" id="seek-tip">0:00</div>
     </div>
     <div class="time-row">
       <span id="t-cur">0:00</span>
@@ -438,18 +639,44 @@
 
   <!-- Controls -->
   <div class="controls">
-    <button class="btn" id="btn-shuf" title="Shuffle">⇄</button>
     <button class="btn" id="btn-prev" title="Prev">⏮</button>
     <button class="btn play"  id="btn-play" title="Play / Pause">▶</button>
     <button class="btn" id="btn-next" title="Next">⏭</button>
-    <button class="btn" id="btn-rep"  title="Repeat">↻</button>
+  </div>
+
+  <!-- Playback mode chips -->
+  <div class="mode-row">
+    <div class="mode-chip active" id="chip-order" title="顺序播放">
+      <span class="chip-icon">↓</span>
+      <span class="chip-lbl">ORDER</span>
+    </div>
+    <div class="mode-chip" id="chip-shuf" title="随机播放">
+      <span class="chip-icon">⇄</span>
+      <span class="chip-lbl">SHUFFLE</span>
+    </div>
+    <div class="mode-chip" id="chip-rep1" title="单曲循环">
+      <span class="chip-icon">↺¹</span>
+      <span class="chip-lbl">ONCE</span>
+    </div>
+    <div class="mode-chip" id="chip-repa" title="列表循环">
+      <span class="chip-icon">↺</span>
+      <span class="chip-lbl">LOOP</span>
+    </div>
   </div>
 
   <!-- Volume -->
   <div class="vol-row">
-    <span class="vol-icon">♫</span>
+    <span class="vol-icon" id="vol-icon" title="静音切换">♫</span>
     <input type="range" class="vol" id="vol" min="0" max="100" value="80">
     <span id="vol-val" style="font-family:'Courier Prime',monospace;font-size:10px;color:var(--dim);min-width:26px;text-align:right">80%</span>
+  </div>
+
+  <!-- Upload local files -->
+  <div class="upload-row">
+    <label class="upload-btn" for="file-input">
+      <span>📁 添加本地音乐</span>
+    </label>
+    <input type="file" id="file-input" accept="audio/*" multiple hidden>
   </div>
 
   <!-- Playlist header -->
@@ -494,221 +721,467 @@
 </script>
 
 <script>
-/* ─── THREE.JS PARTICLE TREE ─────────────────────────── */
+/* ─── THREE.JS MACRO TREE · OPAQUE PERSPECTIVE FIELD ────────────────
+   以清晰可见的树状分枝为前景主体，环形测绘与网格退到后层：
+   1) 主干、枝条、树冠分别成层，避免被扫描环遮住；
+   2) 点云与线段均使用不透明材质，深度关系稳定；
+   3) 鼠标 / 触控拖拽、滚轮缩放、双击复位；
+   4) 音频输入只做缓动后的呼吸反馈，画面不抖动。
+──────────────────────────────────────────────────────────────────── */
 (function(){
 
 const canvas = document.getElementById('bg');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: false,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x050a14, 1);
+renderer.sortObjects = true;
+if (renderer.outputEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth/window.innerHeight, 0.1, 120);
-camera.position.set(0, 1.2, 9);
-camera.lookAt(0, 1.5, 0);
+scene.fog = new THREE.FogExp2(0x050a14, 0.034);
 
-/* ── Particle buffers ── */
-const pts  = [];  // tree + base
-const cols = [];
+const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 180);
+camera.position.set(0, 2.12, 10.15);
+const lookTarget = new THREE.Vector3(0, 1.78, 0.02);
 
-/* ── Recursive branch generator ── */
-const MAX_D = 8;
+const world = new THREE.Group();
+world.position.set(0, -0.12, 0.36);
+scene.add(world);
 
-function branch(ox, oy, oz, dx, dy, dz, len, depth){
-  if(depth < 0 || len < 0.08) return;
+let _seed = 918273;
+function rnd(){ _seed = (_seed * 1664525 + 1013904223) >>> 0; return _seed / 4294967296; }
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function lerp(a, b, t){ return a + (b - a) * t; }
+function norm(x, y, z){ const l = Math.sqrt(x*x + y*y + z*z) || 1; return [x/l, y/l, z/l]; }
 
-  const ex = ox + dx * len;
-  const ey = oy + dy * len;
-  const ez = oz + dz * len;
+function pushColor(arr, y, heat, core){
+  const h = clamp((y + 1.55) / 6.10, 0, 1);
+  const r = lerp(0.26, 0.74, h) + heat * 0.06 + core * 0.08;
+  const g = lerp(0.60, 0.84, h) + heat * 0.05 + core * 0.09;
+  const b = lerp(0.70, 0.78, h) - heat * 0.02 + core * 0.06;
+  arr.push(clamp(r,0,1), clamp(g,0,1), clamp(b,0,1));
+}
 
-  const segments = Math.max(4, Math.floor(len * 18));
-  const bright = 0.15 + (depth / MAX_D) * 0.85;
-  const isTip  = depth <= 2;
-  const noise  = (1 - depth / MAX_D) * 0.06;
+const branchPts = [];
+const branchCols = [];
+const crownPts = [];
+const crownCols = [];
+const corePts = [];
+const coreCols = [];
+const basePts = [];
+const baseCols = [];
+const branchSegs = [];
+const twigSegs = [];
 
-  for(let i = 0; i <= segments; i++){
-    const t = i / segments;
-    pts.push(
-      ox + (ex - ox) * t + (Math.random() - 0.5) * noise,
-      oy + (ey - oy) * t + (Math.random() - 0.5) * noise,
-      oz + (ez - oz) * t + (Math.random() - 0.5) * noise
+function addPoint(bucket, colors, x, y, z, heat, core){
+  bucket.push(x, y, z);
+  pushColor(colors, y, heat || 0, core || 0);
+}
+function addSegment(arr, ax, ay, az, bx, by, bz){
+  arr.push(ax, ay, az, bx, by, bz);
+}
+function smallCloud(bucket, colors, x, y, z, r, n, heat, core){
+  for(let i = 0; i < n; i++){
+    const a = rnd() * Math.PI * 2;
+    const e = (rnd() - 0.5) * Math.PI;
+    const d = Math.pow(rnd(), 0.72) * r;
+    addPoint(
+      bucket, colors,
+      x + Math.cos(a) * Math.cos(e) * d,
+      y + Math.sin(e) * d * 0.62,
+      z + Math.sin(a) * Math.cos(e) * d,
+      heat, core
     );
-    const r = bright * (isTip ? 1.1 : 0.95);
-    const g = bright * 1.02;
-    const b = bright * (isTip ? 0.88 : 1.08);
-    cols.push(r, g, b);
+  }
+}
+
+function grow(ox, oy, oz, dx, dy, dz, len, depth, spread, family){
+  if(depth <= 0 || len < 0.070) return;
+
+  const steps = Math.max(8, Math.floor(len * 22));
+  const twist = (rnd() - 0.5) * 1.25;
+  const side = Math.atan2(dz, dx) + Math.PI / 2;
+  let px = ox, py = oy, pz = oz;
+  const tip = {x: ox, y: oy, z: oz};
+
+  for(let i = 1; i <= steps; i++){
+    const t = i / steps;
+    const arch = Math.sin(t * Math.PI);
+    const lateral = Math.sin(t * Math.PI * 1.7 + twist) * spread * 0.18 * arch;
+    const lift = arch * 0.10 * clamp(dy + 0.25, 0, 1);
+    const x = ox + dx * len * t + Math.cos(side) * lateral;
+    const y = oy + dy * len * t + lift;
+    const z = oz + dz * len * t + Math.sin(side) * lateral;
+
+    const isTwig = depth <= 3 || family === 'twig';
+    addSegment(isTwig ? twigSegs : branchSegs, px, py, pz, x, y, z);
+
+    const jitter = 0.010 + (8 - depth) * 0.002;
+    const repeat = depth > 6 ? 3 : depth > 3 ? 2 : 1;
+    for(let k = 0; k < repeat; k++){
+      addPoint(
+        branchPts, branchCols,
+        x + (rnd() - 0.5) * jitter,
+        y + (rnd() - 0.5) * jitter,
+        z + (rnd() - 0.5) * jitter,
+        0.20 + t * 0.44,
+        depth > 6 ? 0.20 : 0.05
+      );
+    }
+
+    if(depth <= 4 && i % 3 === 0){
+      smallCloud(crownPts, crownCols, x, y, z, len * 0.045, 4, 0.50 + t * 0.28, 0.20);
+    }
+    if(depth <= 2 && i > steps * 0.58 && i % 2 === 0){
+      smallCloud(crownPts, crownCols, x, y, z, len * 0.085, 7, 0.65, 0.28);
+    }
+
+    px = x; py = y; pz = z;
+    tip.x = x; tip.y = y; tip.z = z;
   }
 
-  /* tip particle burst */
-  if(isTip){
-    for(let k = 0; k < 6; k++){
-      pts.push(
-        ex + (Math.random() - 0.5) * 0.15,
-        ey + (Math.random() - 0.5) * 0.15,
-        ez + (Math.random() - 0.5) * 0.15
+  if(depth <= 2){
+    smallCloud(crownPts, crownCols, tip.x, tip.y, tip.z, len * 0.26, 22, 0.72, 0.34);
+  }
+
+  const childCount = depth > 5 ? 4 : depth > 3 ? 3 : 2;
+  for(let c = 0; c < childCount; c++){
+    const split = 0.38 + rnd() * 0.46;
+    const sx = ox + dx * len * split;
+    const sy = oy + dy * len * split + Math.sin(split * Math.PI) * 0.08;
+    const sz = oz + dz * len * split;
+    const baseA = Math.atan2(dz, dx);
+    const fan = (c - (childCount - 1) / 2) * (0.64 + rnd() * 0.32);
+    const a = baseA + fan + (rnd() - 0.5) * 0.55;
+    const radial = depth > 5 ? 0.82 : 1.02;
+    let nx = dx * 0.45 + Math.cos(a) * radial;
+    let ny = dy * 0.35 + (depth > 4 ? 0.34 : 0.18) + (rnd() - 0.45) * 0.24;
+    let nz = dz * 0.45 + Math.sin(a) * radial;
+    [nx, ny, nz] = norm(nx, ny, nz);
+    grow(sx, sy, sz, nx, ny, nz, len * (0.46 + rnd() * 0.24), depth - 1, spread * (0.92 + rnd() * 0.24), depth <= 4 ? 'twig' : family);
+  }
+}
+
+/* 明确可见的树：中心主干 + 多向分枝 + 外层树冠 */
+grow(0, -1.48, 0, 0, 1, 0, 5.35, 9, 0.85, 'main');
+for(let i = 0; i < 11; i++){
+  const a = (i / 11) * Math.PI * 2 + 0.22;
+  const y = -0.42 + rnd() * 2.05;
+  const r = 0.10 + rnd() * 0.16;
+  let dx = Math.cos(a) * (0.76 + rnd() * 0.32);
+  let dy = 0.50 + rnd() * 0.30;
+  let dz = Math.sin(a) * (0.76 + rnd() * 0.32);
+  [dx, dy, dz] = norm(dx, dy, dz);
+  grow(Math.cos(a) * r, y, Math.sin(a) * r, dx, dy, dz, 2.25 + rnd() * 1.35, 6, 0.72, 'main');
+}
+
+/* 中央发光骨架，确保正面也能看到树的纵向轮廓 */
+for(let y = -1.50; y <= 4.45; y += 0.055){
+  const breath = Math.sin((y + 1.5) * 2.4) * 0.035;
+  for(let k = 0; k < 5; k++){
+    addPoint(
+      corePts, coreCols,
+      (rnd() - 0.5) * (0.16 + Math.abs(breath)),
+      y + (rnd() - 0.5) * 0.045,
+      (rnd() - 0.5) * (0.16 + Math.abs(breath)),
+      0.72,
+      0.72
+    );
+  }
+}
+
+/* 外层宏观冠层，稀疏但实体，不依赖透明混合 */
+for(let i = 0; i < 1850; i++){
+  const a = rnd() * Math.PI * 2;
+  const rr = Math.pow(rnd(), 0.66) * (1.05 + rnd() * 1.65);
+  const y = 1.45 + Math.pow(rnd(), 0.72) * 3.05;
+  const flat = 0.48 + (y - 1.45) * 0.07;
+  addPoint(
+    crownPts, crownCols,
+    Math.cos(a) * rr + (rnd() - 0.5) * 0.18,
+    y + (rnd() - 0.5) * 0.28,
+    Math.sin(a) * rr * flat + (rnd() - 0.5) * 0.18,
+    0.62 + rnd() * 0.22,
+    0.22 + rnd() * 0.18
+  );
+}
+
+function flatLayer(y, hw, sp){
+  for(let x = -hw; x <= hw; x += sp){
+    for(let z = -hw; z <= hw; z += sp){
+      const edge = Math.max(Math.abs(x), Math.abs(z)) / hw;
+      if(edge > 0.92 && rnd() < 0.18) continue;
+      addPoint(
+        basePts, baseCols,
+        x + (rnd() - 0.5) * sp * 0.34,
+        y + (rnd() - 0.5) * 0.028,
+        z + (rnd() - 0.5) * sp * 0.34,
+        0.08,
+        edge > 0.84 ? 0.20 : 0.05
       );
-      const tb = bright + Math.random() * 0.3;
-      cols.push(tb * 1.1, tb, tb * 0.85);
     }
   }
+}
+flatLayer(-1.54, 1.92, 0.092);
+flatLayer(-1.36, 1.58, 0.105);
+flatLayer(-1.18, 1.20, 0.125);
+flatLayer(-1.00, 0.84, 0.150);
 
-  /* child branches */
-  const nKids = depth > 4 ? 3 : 2;
-  for(let k = 0; k < nKids; k++){
-    const baseAngle = (k / nKids) * Math.PI * 2 + Math.random() * 1.0;
-    const spreadH   = 0.35 + (1 - depth / MAX_D) * 0.75;
-    const spreadV   = 0.2  + (1 - depth / MAX_D) * 0.4;
-
-    /* perturb direction */
-    const cos = Math.cos(baseAngle);
-    const sin = Math.sin(baseAngle);
-    let nx = dx * Math.cos(spreadH) + cos * Math.sin(spreadH);
-    let nz = dz * Math.cos(spreadH) + sin * Math.sin(spreadH);
-    let ny = dy + spreadV * (0.3 + Math.random() * 0.5);
-
-    /* normalise */
-    let nl = Math.sqrt(nx*nx + ny*ny + nz*nz);
-    nx /= nl; ny /= nl; nz /= nl;
-
-    /* bias upward so branches don't droop completely */
-    ny = Math.max(ny, 0.15);
-    nl = Math.sqrt(nx*nx + ny*ny + nz*nz);
-    nx /= nl; ny /= nl; nz /= nl;
-
-    branch(ex, ey, ez, nx, ny, nz,
-      len * (0.48 + Math.random() * 0.28), depth - 1);
+/* 下部结构只作为抽象支撑，位置低且不遮树 */
+for(let y = -1.50; y < 0.08; y += 0.07){
+  for(let arm = 0; arm < 4; arm++){
+    const a = arm * Math.PI / 2;
+    for(let r = 0; r < 0.82; r += 0.07){
+      addPoint(basePts, baseCols, Math.cos(a) * r + (rnd() - 0.5) * 0.024, y, Math.sin(a) * r + (rnd() - 0.5) * 0.024, 0.15, 0.18);
+    }
   }
 }
 
-/* trunk */
-branch(0, -1.8, 0,  0, 1, 0,  2.6, MAX_D);
-
-/* structural cross at crown (like the metal frame in the game) */
-const crownY = 0.8;
-for(let i = 0; i < 4; i++){
-  const a = (i / 4) * Math.PI * 2;
-  for(let t = 0; t <= 20; t++){
-    const tt = t / 20;
-    pts.push(Math.cos(a) * tt * 0.45, crownY + (Math.random()-0.5)*0.06, Math.sin(a) * tt * 0.45);
-    const b2 = 0.6 + tt * 0.4;
-    cols.push(b2, b2 * 0.95, b2 * 0.85);
+function makePoints(pos, col, size){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const m = new THREE.PointsMaterial({
+    size,
+    vertexColors: true,
+    sizeAttenuation: true,
+    transparent: false,
+    depthTest: true,
+    depthWrite: true,
+    blending: THREE.NoBlending
+  });
+  const mesh = new THREE.Points(g, m);
+  mesh.frustumCulled = false;
+  return mesh;
+}
+function makeSegments(pos, color){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.LineBasicMaterial({
+    color,
+    transparent: false,
+    depthTest: true,
+    depthWrite: true
+  });
+  const mesh = new THREE.LineSegments(g, m);
+  mesh.frustumCulled = false;
+  return mesh;
+}
+function makeLine(points, color){
+  const g = new THREE.BufferGeometry().setFromPoints(points);
+  const m = new THREE.LineBasicMaterial({ color, transparent: false, depthTest: true, depthWrite: true });
+  return new THREE.Line(g, m);
+}
+function makeCircle(r, segs, color){
+  const pts = [];
+  for(let i = 0; i <= segs; i++){
+    const a = (i / segs) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0));
   }
-}
-/* vertical post */
-for(let t = 0; t <= 30; t++){
-  const tt = t / 30;
-  pts.push((Math.random()-0.5)*0.04, crownY - 0.3 + tt * 0.6, (Math.random()-0.5)*0.04);
-  const b3 = 0.5 + tt * 0.4;
-  cols.push(b3, b3, b3 * 1.05);
+  return makeLine(pts, color);
 }
 
-/* base platform (rectangular grid) */
-for(let i = 0; i < 4000; i++){
-  const bx = (Math.random() - 0.5) * 4.5;
-  const bz = (Math.random() - 0.5) * 4.5;
-  const by = -1.8 - Math.random() * 0.18;
-  const distCentre = Math.sqrt(bx*bx + bz*bz);
-  const b4 = Math.max(0, 0.35 - distCentre * 0.06) + Math.random() * 0.1;
-  pts.push(bx, by, bz);
-  cols.push(b4 * 0.85, b4, b4 * 1.1);
+const baseMesh = makePoints(basePts, baseCols, 0.028);
+const branchMesh = makePoints(branchPts, branchCols, 0.031);
+const crownMesh = makePoints(crownPts, crownCols, 0.0235);
+const coreMesh = makePoints(corePts, coreCols, 0.043);
+const branchLines = makeSegments(branchSegs, 0x75b8b0);
+const twigLines = makeSegments(twigSegs, 0x98d5cb);
+
+baseMesh.renderOrder = 2;
+branchLines.renderOrder = 4;
+twigLines.renderOrder = 5;
+branchMesh.renderOrder = 6;
+crownMesh.renderOrder = 7;
+coreMesh.renderOrder = 8;
+world.add(baseMesh, branchLines, twigLines, branchMesh, crownMesh, coreMesh);
+
+/* 环和网格整体后移，树不会再被放到后面 */
+const ringG = new THREE.Group();
+ringG.position.set(0, 2.12, -0.86);
+world.add(ringG);
+ringG.add(makeCircle(3.68, 256, 0x7d8e92));
+ringG.add(makeCircle(3.48, 180, 0x274b56));
+ringG.add(makeCircle(3.10, 128, 0x17313b));
+for(let i = 0; i < 120; i++){
+  const a = (i / 120) * Math.PI * 2;
+  const major = i % 10 === 0;
+  const mid = i % 5 === 0 && !major;
+  const r0 = 3.68;
+  const r1 = r0 + (major ? 0.20 : mid ? 0.10 : 0.055);
+  const col = major ? 0xbfd5d1 : mid ? 0x6f9192 : 0x31515a;
+  ringG.add(makeLine([
+    new THREE.Vector3(Math.cos(a) * r0, Math.sin(a) * r0, 0),
+    new THREE.Vector3(Math.cos(a) * r1, Math.sin(a) * r1, 0)
+  ], col));
 }
-/* platform edge highlight */
-for(let i = 0; i < 800; i++){
-  const a2 = Math.random() * Math.PI * 2;
-  const side = Math.random() < 0.5
-    ? [(Math.random()-0.5)*4.5, (Math.random()<0.5 ? -2.25 : 2.25)]
-    : [(Math.random()<0.5 ? -2.25 : 2.25), (Math.random()-0.5)*4.5];
-  pts.push(side[0], -1.8 + (Math.random()-0.5)*0.06, side[1]);
-  const be = 0.25 + Math.random() * 0.2;
-  cols.push(be * 0.8, be, be * 1.15);
+for(let q = 0; q < 4; q++){
+  const base = q * Math.PI / 2;
+  const span = 0.30;
+  const arc = [];
+  for(let i = 0; i <= 28; i++){
+    const a = base - span / 2 + (i / 28) * span;
+    arc.push(new THREE.Vector3(Math.cos(a) * 3.68, Math.sin(a) * 3.68, 0));
+  }
+  ringG.add(makeLine(arc, 0xaecdc8));
+  ringG.add(makeLine([
+    new THREE.Vector3(Math.cos(base) * 3.68, Math.sin(base) * 3.68, 0),
+    new THREE.Vector3(Math.cos(base) * 4.05, Math.sin(base) * 4.05, 0)
+  ], 0xa4c7c1));
 }
 
-/* base glow core */
-for(let i = 0; i < 600; i++){
-  const a3 = Math.random() * Math.PI * 2;
-  const r2 = Math.random() * 0.9;
-  pts.push(Math.cos(a3)*r2, -1.78, Math.sin(a3)*r2);
-  const bg = 0.4 + Math.random() * 0.35;
-  cols.push(bg * 0.75, bg, bg * 1.05);
+const gridG = new THREE.Group();
+gridG.position.z = -2.18;
+scene.add(gridG);
+for(let y = -2.2; y <= 9.2; y += 1.4){
+  gridG.add(makeLine([new THREE.Vector3(-11.4, y, 0), new THREE.Vector3(11.4, y, 0)], 0x0c2230));
+}
+for(let x = -11.2; x <= 11.2; x += 1.4){
+  gridG.add(makeLine([new THREE.Vector3(x, -2.4, 0), new THREE.Vector3(x, 9.4, 0)], 0x0c2230));
 }
 
-/* ── Build geometry ── */
-const geo = new THREE.BufferGeometry();
-geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-geo.setAttribute('color',    new THREE.Float32BufferAttribute(cols, 3));
-
-const mat = new THREE.PointsMaterial({
-  size: 0.028, vertexColors: true,
-  transparent: true, opacity: 0.92,
-  sizeAttenuation: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
-const tree = new THREE.Points(geo, mat);
-scene.add(tree);
-
-/* ── Ambient drifting particles ── */
-const ambPts = [], ambCols = [];
-for(let i = 0; i < 360; i++){
-  ambPts.push(
-    (Math.random()-0.5) * 14,
-    Math.random() * 10 - 2.5,
-    (Math.random()-0.5) * 14
-  );
-  ambCols.push(0.2, 0.55, 0.5);
+const AC = 700;
+const amb = [];
+const ambSeed = [];
+for(let i = 0; i < AC; i++){
+  amb.push((rnd() - 0.5) * 24, rnd() * 13 - 1.8, (rnd() - 0.5) * 24);
+  ambSeed.push(rnd());
 }
 const ambGeo = new THREE.BufferGeometry();
-ambGeo.setAttribute('position', new THREE.Float32BufferAttribute(ambPts, 3));
-ambGeo.setAttribute('color',    new THREE.Float32BufferAttribute(ambCols, 3));
+const ambPos = new Float32Array(amb);
+ambGeo.setAttribute('position', new THREE.BufferAttribute(ambPos, 3));
 const ambMat = new THREE.PointsMaterial({
-  size: 0.04, vertexColors: true,
-  transparent: true, opacity: 0.35,
-  sizeAttenuation: true, depthWrite: false,
-  blending: THREE.AdditiveBlending,
+  color: 0x2e6671,
+  size: 0.018,
+  sizeAttenuation: true,
+  transparent: false,
+  depthTest: true,
+  depthWrite: true
 });
-const amb = new THREE.Points(ambGeo, ambMat);
-scene.add(amb);
+const ambMesh = new THREE.Points(ambGeo, ambMat);
+scene.add(ambMesh);
+const ambOrig = amb.slice();
 
-const ambPos  = ambGeo.attributes.position.array;
-const ambPos0 = ambPos.slice();  /* original Y values */
-
-/* ── Mouse parallax ── */
-let mx = 0, my = 0;
-document.addEventListener('mousemove', e => {
-  mx = (e.clientX / window.innerWidth  - 0.5) * 2;
-  my = (e.clientY / window.innerHeight - 0.5) * 2;
+const input = {
+  mx: 0, my: 0,
+  yaw: 0.18, pitch: -0.01,
+  manualYaw: 0.18, manualPitch: -0.01,
+  zoom: 10.15, zoomTarget: 10.15,
+  dragging: false,
+  lastX: 0, lastY: 0,
+  auto: 0
+};
+function isPanelEvent(e){ return e.target && e.target.closest && e.target.closest('#player'); }
+window.addEventListener('pointermove', (e) => {
+  input.mx = (e.clientX / window.innerWidth - 0.5) * 2;
+  input.my = (e.clientY / window.innerHeight - 0.5) * 2;
+  if(input.dragging){
+    const dx = e.clientX - input.lastX;
+    const dy = e.clientY - input.lastY;
+    input.manualYaw += dx * 0.0065;
+    input.manualPitch = clamp(input.manualPitch + dy * 0.0042, -0.32, 0.24);
+    input.lastX = e.clientX;
+    input.lastY = e.clientY;
+  }
+}, { passive: true });
+window.addEventListener('pointerdown', (e) => {
+  if(isPanelEvent(e)) return;
+  input.dragging = true;
+  input.lastX = e.clientX;
+  input.lastY = e.clientY;
+});
+window.addEventListener('pointerup', () => input.dragging = false);
+window.addEventListener('pointercancel', () => input.dragging = false);
+window.addEventListener('wheel', (e) => {
+  if(isPanelEvent(e)) return;
+  input.zoomTarget = clamp(input.zoomTarget + e.deltaY * 0.004, 6.80, 12.00);
+}, { passive: true });
+window.addEventListener('dblclick', (e) => {
+  if(isPanelEvent(e)) return;
+  input.manualYaw = 0.18;
+  input.manualPitch = -0.01;
+  input.zoomTarget = 10.15;
 });
 
-/* ── Animate ── */
-let t = 0;
-(function loop(){
-  requestAnimationFrame(loop);
-  t += 0.004;
+const clock = new THREE.Clock();
+let level = 0, bass = 0, treble = 0;
+let resizeQueued = false;
 
-  tree.rotation.y = t * 0.07 + mx * 0.12;
-  tree.rotation.x = my * 0.04;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.034, clock.getDelta());
+  const time = clock.elapsedTime;
+  const fx = window.__LISTEN_AUDIO__ || { level: 0, bass: 0, treble: 0 };
+  level  += ((fx.level  || 0) - level)  * 0.055;
+  bass   += ((fx.bass   || 0) - bass)   * 0.065;
+  treble += ((fx.treble || 0) - treble) * 0.060;
 
-  /* drift particles upward in a loop */
-  for(let i = 0; i < 360; i++){
-    ambPos[i*3+1] = ((ambPos0[i*3+1] + t * 0.35 + i * 0.09) % 10) - 2.5;
+  input.auto += dt * (0.072 + level * 0.038);
+  const targetYaw = input.auto + input.manualYaw + input.mx * 0.15;
+  const targetPitch = input.manualPitch - input.my * 0.050;
+  input.yaw += (targetYaw - input.yaw) * 0.075;
+  input.pitch += (targetPitch - input.pitch) * 0.075;
+  input.zoom += (input.zoomTarget - input.zoom) * 0.070;
+
+  world.rotation.y = input.yaw;
+  world.rotation.x = input.pitch;
+  world.scale.setScalar(0.94 + bass * 0.018);
+
+  const pulse = 1 + Math.sin(time * 0.92) * 0.010 + level * 0.040;
+  branchMesh.material.size += ((0.031 + level * 0.009 + bass * 0.004) - branchMesh.material.size) * 0.07;
+  crownMesh.material.size += ((0.0235 + treble * 0.007 + level * 0.003) - crownMesh.material.size) * 0.07;
+  coreMesh.material.size += ((0.043 + bass * 0.012) - coreMesh.material.size) * 0.07;
+  crownMesh.scale.setScalar(pulse);
+  coreMesh.scale.set(1 + bass * 0.020, 1 + level * 0.008, 1 + bass * 0.020);
+
+  branchLines.rotation.y = Math.sin(time * 0.22) * 0.0045;
+  twigLines.rotation.y = Math.sin(time * 0.28 + 1.4) * 0.007;
+  ringG.rotation.z += dt * (0.052 + level * 0.050);
+  ringG.scale.setScalar(1 + level * 0.007 + bass * 0.004);
+
+  gridG.position.x += (input.mx * 0.18 - gridG.position.x) * 0.040;
+  gridG.position.y += (-input.my * 0.10 - gridG.position.y) * 0.040;
+
+  for(let i = 0; i < AC; i++){
+    const i3 = i * 3;
+    const s = ambSeed[i];
+    ambPos[i3]     = ambOrig[i3]     + Math.cos(time * 0.31 + s * 18.0) * (0.08 + treble * 0.10);
+    ambPos[i3 + 1] = ambOrig[i3 + 1] + Math.sin(time * 0.27 + s * 15.0) * (0.12 + level * 0.10);
+    ambPos[i3 + 2] = ambOrig[i3 + 2] + Math.sin(time * 0.19 + s * 11.0) * 0.055;
   }
   ambGeo.attributes.position.needsUpdate = true;
-  amb.rotation.y = t * 0.015;
+  ambMesh.rotation.y += dt * 0.012;
 
-  /* gentle camera sway toward mouse */
-  camera.position.x += (mx * 0.6 - camera.position.x) * 0.018;
-  camera.position.y += (-my * 0.3 + 1.2 - camera.position.y) * 0.018;
-  camera.lookAt(0, 1.5, 0);
+  const camX = input.mx * 0.32;
+  const camY = 2.06 - input.my * 0.13 + level * 0.022;
+  camera.position.x += (camX - camera.position.x) * 0.045;
+  camera.position.y += (camY - camera.position.y) * 0.045;
+  camera.position.z += (input.zoom - camera.position.z) * 0.050;
+  lookTarget.set(0, 1.76 + bass * 0.035, 0.03);
+  camera.lookAt(lookTarget);
 
   renderer.render(scene, camera);
-})();
+}
+animate();
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+function onResize(){
+  if(resizeQueued) return;
+  resizeQueued = true;
+  requestAnimationFrame(() => {
+    resizeQueued = false;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+window.addEventListener('resize', onResize);
 
 })();
 </script>
@@ -717,51 +1190,28 @@ window.addEventListener('resize', () => {
 /* ─── MUSIC PLAYER ───────────────────────────────────── */
 (function(){
 
-/* ╔══════════════════════════════════════════════════╗
-   ║  SONG LIST  — fill in your own src / duration   ║
-   ║                                                  ║
-   ║  src options:                                    ║
-   ║  · relative path: "audio/song.mp3"               ║
-   ║  · hosted CDN URL                                ║
-   ║  · NetEase redirect (may be region-locked):      ║
-   ║    "https://music.163.com/song/media/outer/      ║
-   ║     url?id=SONG_ID.mp3"                          ║
-   ╚══════════════════════════════════════════════════╝ */
-const SONGS = [
-  {
-    id:       '3371305930',
-    title:    '示例曲目 01',
-    artist:   'Arknights: Endfield OST',
-    duration: '4:23',
-    /* 替换为实际音频链接 */
-    src:      'https://music.163.com/song/media/outer/url?id=3371305930.mp3',
-    /* 后备链接 (NetEase 外链播放) */
-    fallback: 'https://music.163.com/#/song?id=3371305930'
-  },
-  {
-    id:       '2700421303',
-    title:    '示例曲目 02',
-    artist:   'Arknights: Endfield OST',
-    duration: '3:55',
-    src:      'https://music.163.com/song/media/outer/url?id=2700421303.mp3',
-    fallback: 'https://music.163.com/#/song?id=2700421303'
-  },
-  {
-    id:       '65778',
-    title:    '千本桜',
-    artist:   '初音ミク',
-    duration: '4:11',
-    src:      'https://music.163.com/song/media/outer/url?id=65778.mp3',
-    fallback: 'https://music.163.com/#/song?id=65778'
-  }
-];
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  Meting API · 网易云音乐在线曲库                         ║
+   ║                                                          ║
+   ║  修改歌曲：把 SONG_IDS 里的 ID 换成你想要的             ║
+   ║  网易云歌曲链接：https://music.163.com/#/song?id=XXXXXX  ║
+   ║  换平台：SERVER 改成 'netease'/'tencent'/'kugou'         ║
+   ╚══════════════════════════════════════════════════════════╝ */
+const SONG_IDS  = ['3371305930', '2700421303'];
+const SERVER    = 'netease';
+const API_BASE  = 'https://api.injahow.cn/meting/';
+const API_FALLBACK = 'https://api.i-meto.com/meting/api';
+
+let SONGS = [];   // 由 API 填充后使用
 
 /* ── State ── */
 let cur      = 0;
 let playing  = false;
-let shuffle  = false;
-let repeat   = false;
+// playMode: 'order' | 'shuffle' | 'repeat-one' | 'repeat-all'
+let playMode = 'order';
 let seeking  = false;
+let muted    = false;
+let lastVol  = 80;
 
 /* ── DOM refs ── */
 const playerEl  = document.getElementById('player');
@@ -771,18 +1221,25 @@ const npArtist  = document.getElementById('np-artist');
 const npIdx     = document.getElementById('np-idx');
 const progFill  = document.getElementById('prog-fill');
 const progTrack = document.getElementById('prog-track');
+const seekTip   = document.getElementById('seek-tip');
 const tCur      = document.getElementById('t-cur');
 const tTot      = document.getElementById('t-tot');
 const btnPlay   = document.getElementById('btn-play');
 const btnPrev   = document.getElementById('btn-prev');
 const btnNext   = document.getElementById('btn-next');
-const btnShuf   = document.getElementById('btn-shuf');
-const btnRep    = document.getElementById('btn-rep');
 const volEl     = document.getElementById('vol');
 const volVal    = document.getElementById('vol-val');
+const volIcon   = document.getElementById('vol-icon');
+const chipOrder = document.getElementById('chip-order');
+const chipShuf  = document.getElementById('chip-shuf');
+const chipRep1  = document.getElementById('chip-rep1');
+const chipRepA  = document.getElementById('chip-repa');
 const plToggle  = document.getElementById('pl-toggle');
 const plList    = document.getElementById('pl-list');
 const plCnt     = document.getElementById('pl-cnt');
+const spectrum  = document.getElementById('spectrum');
+const fxStatus  = document.getElementById('fx-status');
+const rootStyle = document.documentElement.style;
 
 /* ── Helpers ── */
 function fmt(s){
@@ -792,8 +1249,141 @@ function fmt(s){
   return `${m}:${sec.toString().padStart(2,'0')}`;
 }
 
+function setFxStatus(text, mode){
+  fxStatus.textContent = text;
+  fxStatus.classList.toggle('live', mode === 'live');
+  fxStatus.classList.toggle('warn', mode === 'warn');
+}
+
+/* ── Audio-reactive visual engine ──
+   Web Audio API 会读取音频频谱；如果外链因 CORS/地区限制读不到数据，
+   自动切到“伪频谱”动画，保证视觉效果不会停住。 */
+const BAR_COUNT = 32;
+const specBars = [];
+const fx = window.__LISTEN_AUDIO__ = {
+  level: 0, bass: 0, mid: 0, treble: 0,
+  analyserReady: false, usingFallback: false
+};
+const audioFx = {
+  ctx: null, source: null, analyser: null, data: null,
+  silentFrames: 0, phase: 0
+};
+
+for(let i = 0; i < BAR_COUNT; i++){
+  const bar = document.createElement('i');
+  bar.className = 'spec-bar';
+  spectrum.appendChild(bar);
+  specBars.push(bar);
+}
+
+function avgRange(data, start, end){
+  let sum = 0;
+  for(let i = start; i < end; i++) sum += data[i] || 0;
+  return sum / Math.max(1, end - start) / 255;
+}
+
+async function ensureAudioFx(){
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if(!AudioContext) throw new Error('Web Audio API is not supported');
+
+    if(!audioFx.ctx){
+      audioFx.ctx = new AudioContext();
+      audioFx.source = audioFx.ctx.createMediaElementSource(audio);
+      audioFx.analyser = audioFx.ctx.createAnalyser();
+      audioFx.analyser.fftSize = 128;
+      audioFx.analyser.smoothingTimeConstant = 0.78;
+      audioFx.data = new Uint8Array(audioFx.analyser.frequencyBinCount);
+      audioFx.source.connect(audioFx.analyser);
+      audioFx.analyser.connect(audioFx.ctx.destination);
+    }
+    if(audioFx.ctx.state === 'suspended') await audioFx.ctx.resume();
+    fx.analyserReady = true;
+    setFxStatus('AUDIO FIELD: ANALYSER LINKED', 'live');
+  } catch(err) {
+    fx.analyserReady = false;
+    fx.usingFallback = true;
+    setFxStatus('AUDIO FIELD: VISUAL FALLBACK', 'warn');
+    console.warn('Audio visualiser fallback:', err.message);
+  }
+}
+
+function fallbackLevels(){
+  audioFx.phase += 0.09;
+  const a = audioFx.phase;
+  return {
+    level: 0.32 + Math.sin(a * 1.7) * 0.12 + Math.sin(a * 0.43) * 0.08,
+    bass:  0.38 + Math.sin(a * 2.1) * 0.22,
+    mid:   0.24 + Math.sin(a * 1.3 + 1.1) * 0.14,
+    treble:0.18 + Math.sin(a * 3.0 + 0.6) * 0.12
+  };
+}
+
+function paintSpectrum(levels, freqData){
+  specBars.forEach((bar, i) => {
+    let v;
+    if(freqData){
+      const idx = Math.min(freqData.length - 1, Math.floor((i / BAR_COUNT) * freqData.length * 0.82));
+      v = freqData[idx] / 255;
+    } else {
+      const wave = Math.sin(audioFx.phase * 2.2 + i * 0.42) * 0.5 + 0.5;
+      v = Math.max(0.08, wave * levels.level + (i < 8 ? levels.bass * 0.45 : 0));
+    }
+    const h = 3 + Math.min(1, v) * 30;
+    bar.style.height = h.toFixed(1) + 'px';
+  });
+}
+
+function pushLevels(target, freqData){
+  fx.level  += (Math.max(0, Math.min(1, target.level))  - fx.level)  * 0.16;
+  fx.bass   += (Math.max(0, Math.min(1, target.bass))   - fx.bass)   * 0.18;
+  fx.mid    += (Math.max(0, Math.min(1, target.mid))    - fx.mid)    * 0.14;
+  fx.treble += (Math.max(0, Math.min(1, target.treble)) - fx.treble) * 0.14;
+
+  rootStyle.setProperty('--audio-level', fx.level.toFixed(3));
+  rootStyle.setProperty('--audio-bass', fx.bass.toFixed(3));
+  rootStyle.setProperty('--audio-mid', fx.mid.toFixed(3));
+  paintSpectrum(fx, freqData);
+}
+
+(function animateAudioFx(){
+  requestAnimationFrame(animateAudioFx);
+
+  if(!playing){
+    pushLevels({ level: 0, bass: 0, mid: 0, treble: 0 }, null);
+    return;
+  }
+
+  let target = null;
+  let freqData = null;
+
+  if(audioFx.analyser && audioFx.data){
+    audioFx.analyser.getByteFrequencyData(audioFx.data);
+    const raw = avgRange(audioFx.data, 0, audioFx.data.length);
+    if(raw < 0.004) audioFx.silentFrames += 1;
+    else audioFx.silentFrames = 0;
+
+    if(audioFx.silentFrames < 35){
+      target = {
+        level:  raw * 1.55,
+        bass:   avgRange(audioFx.data, 0, 7) * 1.85,
+        mid:    avgRange(audioFx.data, 8, 20) * 1.35,
+        treble: avgRange(audioFx.data, 21, audioFx.data.length) * 1.5
+      };
+      freqData = audioFx.data;
+      fx.usingFallback = false;
+    }
+  }
+
+  if(!target){
+    target = fallbackLevels();
+    fx.usingFallback = true;
+  }
+  pushLevels(target, freqData);
+})();
+
 function nextIdx(){
-  if(shuffle) return Math.floor(Math.random() * SONGS.length);
+  if(playMode === 'shuffle') return Math.floor(Math.random() * SONGS.length);
   return (cur + 1) % SONGS.length;
 }
 function prevIdx(){
@@ -807,6 +1397,9 @@ function renderList(){
     const d = document.createElement('div');
     d.className = 'pl-item' + (i === cur ? ' cur' : '') +
                   (i === cur && playing ? ' playing' : '');
+    const thumbHtml = s.cover
+      ? `<img class="pl-thumb" src="${s.cover}" alt="" onload="this.classList.add('loaded')" onerror="this.style.display='none'">`
+      : '';
     d.innerHTML =
       `<div class="pl-num">${i+1}</div>
        <div class="pl-bars">
@@ -814,6 +1407,7 @@ function renderList(){
          <div class="pl-bar"></div>
          <div class="pl-bar"></div>
        </div>
+       ${thumbHtml}
        <div class="pl-info">
          <div class="pl-it-title">${s.title}</div>
          <div class="pl-it-artist">${s.artist}</div>
@@ -837,18 +1431,37 @@ function load(idx, autoplay){
   progFill.style.width = '0%';
   tCur.textContent = '0:00';
   tTot.textContent = s.duration;
+  setFxStatus('AUDIO FIELD: STANDBY', '');
 
-  if(autoplay){
-    audio.play().catch(err => {
-      /* CORS or region error → open fallback NetEase page */
-      console.warn('Audio play failed:', err.message);
-      if(s.fallback) window.open(s.fallback, '_blank');
-    });
-    setPlaying(true);
+  /* Cover art */
+  const coverEl = document.getElementById('art-cover');
+  if(s.cover){
+    coverEl.onload = () => coverEl.classList.add('loaded');
+    coverEl.onerror = () => coverEl.classList.remove('loaded');
+    coverEl.classList.remove('loaded');
+    coverEl.src = s.cover;
   } else {
-    setPlaying(false);
+    coverEl.classList.remove('loaded');
+    coverEl.src = '';
   }
+
+  if(autoplay) startPlayback();
+  else setPlaying(false);
   renderList();
+}
+
+async function startPlayback(){
+  const s = SONGS[cur];
+  await ensureAudioFx();
+  try {
+    await audio.play();
+    setPlaying(true);
+  } catch(err) {
+    console.warn('Audio play failed:', err.message);
+    setPlaying(false);
+    setFxStatus('AUDIO FIELD: SOURCE BLOCKED / CHECK SRC', 'warn');
+    // 不再自动弹出新窗口；需要外链备用页时可以手动打开 s.fallback。
+  }
 }
 
 /* ── Toggle playing state ── */
@@ -861,19 +1474,28 @@ function setPlaying(val){
   });
 }
 
+/* ── Mode chips ── */
+function setMode(m){
+  playMode = m;
+  audio.loop = (m === 'repeat-one');
+  [chipOrder, chipShuf, chipRep1, chipRepA].forEach(c => c.classList.remove('active'));
+  ({ 'order': chipOrder, 'shuffle': chipShuf,
+     'repeat-one': chipRep1, 'repeat-all': chipRepA })[m].classList.add('active');
+}
+chipOrder.addEventListener('click', () => setMode('order'));
+chipShuf .addEventListener('click', () => setMode('shuffle'));
+chipRep1 .addEventListener('click', () => setMode('repeat-one'));
+chipRepA .addEventListener('click', () => setMode('repeat-all'));
+
 /* ── Controls ── */
 btnPlay.addEventListener('click', () => {
-  if(!audio.src || audio.src === window.location.href){
+  if(!audio.getAttribute('src')){
     load(cur, true); return;
   }
   if(playing){
     audio.pause(); setPlaying(false);
   } else {
-    audio.play().catch(err => {
-      const s = SONGS[cur];
-      if(s.fallback) window.open(s.fallback,'_blank');
-    });
-    setPlaying(true);
+    startPlayback();
   }
 });
 
@@ -888,17 +1510,6 @@ btnNext.addEventListener('click', () => {
   load(nextIdx(), true);
 });
 
-btnShuf.addEventListener('click', () => {
-  shuffle = !shuffle;
-  btnShuf.classList.toggle('active', shuffle);
-});
-
-btnRep.addEventListener('click', () => {
-  repeat = !repeat;
-  audio.loop = repeat;
-  btnRep.classList.toggle('active', repeat);
-});
-
 /* ── Progress ── */
 audio.addEventListener('timeupdate', () => {
   if(!seeking && audio.duration){
@@ -909,49 +1520,211 @@ audio.addEventListener('timeupdate', () => {
   }
 });
 
-progTrack.addEventListener('click', e => {
+audio.addEventListener('loadedmetadata', () => {
+  if(audio.duration) tTot.textContent = fmt(audio.duration);
+});
+
+audio.addEventListener('error', () => {
+  setPlaying(false);
+  setFxStatus('AUDIO FIELD: SOURCE ERROR', 'warn');
+});
+
+function seekByPointer(e){
   if(!audio.duration) return;
   const r = progTrack.getBoundingClientRect();
-  audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+  const pct = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  audio.currentTime = pct * audio.duration;
+  progFill.style.width = (pct * 100) + '%';
+  tCur.textContent = fmt(audio.currentTime);
+}
+
+/* Seek tooltip on hover */
+progTrack.addEventListener('mousemove', e => {
+  if(!audio.duration) return;
+  const r = progTrack.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  seekTip.textContent = fmt(pct * audio.duration);
+  seekTip.style.left = (pct * 100) + '%';
 });
 
-progTrack.addEventListener('mousedown', () => { seeking = true; });
-window.addEventListener('mouseup', e => {
-  if(seeking){
-    seeking = false;
-    const r = progTrack.getBoundingClientRect();
-    const pct = Math.min(1, Math.max(0,(e.clientX - r.left) / r.width));
-    if(audio.duration) audio.currentTime = pct * audio.duration;
-  }
+progTrack.addEventListener('pointerdown', e => {
+  seeking = true;
+  progTrack.setPointerCapture?.(e.pointerId);
+  seekByPointer(e);
 });
+progTrack.addEventListener('pointermove', e => {
+  if(seeking) seekByPointer(e);
+});
+progTrack.addEventListener('pointerup', e => {
+  seeking = false;
+  progTrack.releasePointerCapture?.(e.pointerId);
+});
+progTrack.addEventListener('pointercancel', () => { seeking = false; });
 
 audio.addEventListener('ended', () => {
-  if(!repeat) load(nextIdx(), true);
+  if(playMode === 'repeat-one') return; // audio.loop handles it
+  if(playMode === 'repeat-all' || playMode === 'order' || playMode === 'shuffle'){
+    load(nextIdx(), true);
+  }
 });
 
 audio.addEventListener('play',  () => setPlaying(true));
 audio.addEventListener('pause', () => setPlaying(false));
 
-/* ── Volume ── */
+/* ── Volume + Mute ── */
 audio.volume = 0.8;
+function updateVolUI(){
+  const v = muted ? 0 : volEl.value / 100;
+  audio.volume = v;
+  volIcon.textContent = muted || volEl.value == 0 ? '🔇' : volEl.value < 50 ? '🔉' : '🔊';
+  volVal.textContent  = muted ? '0%' : volEl.value + '%';
+}
 volEl.addEventListener('input', () => {
-  audio.volume = volEl.value / 100;
-  volVal.textContent = volEl.value + '%';
+  muted = false;
+  updateVolUI();
+});
+volIcon.addEventListener('click', () => {
+  if(muted){
+    muted = false;
+    volEl.value = lastVol;
+  } else {
+    lastVol = volEl.value;
+    muted = true;
+  }
+  updateVolUI();
+});
+updateVolUI();
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', e => {
+  // Don't fire if user is typing in an input
+  if(e.target.tagName === 'INPUT') return;
+  switch(e.code){
+    case 'Space':
+      e.preventDefault();
+      btnPlay.click();
+      break;
+    case 'ArrowRight':
+      if(e.shiftKey){ btnNext.click(); }
+      else if(audio.duration){ audio.currentTime = Math.min(audio.duration, audio.currentTime + 5); }
+      break;
+    case 'ArrowLeft':
+      if(e.shiftKey){ btnPrev.click(); }
+      else if(audio.duration){ audio.currentTime = Math.max(0, audio.currentTime - 5); }
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      volEl.value = Math.min(100, +volEl.value + 5);
+      muted = false; updateVolUI();
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      volEl.value = Math.max(0, +volEl.value - 5);
+      muted = false; updateVolUI();
+      break;
+    case 'KeyM':
+      volIcon.click();
+      break;
+  }
 });
 
 /* ── Playlist toggle ── */
 plToggle.addEventListener('click', () => {
-  plToggle.parentElement.classList.toggle('pl-open');
-  /* keep parent = player */
-  document.getElementById('player').classList.toggle('pl-open');
+  playerEl.classList.toggle('pl-open');
 });
 
+/* ── Meting API fetch ── */
+async function fetchSong(id, useFallback){
+  const url = useFallback
+    ? `${API_FALLBACK}?server=${SERVER}&type=song&id=${id}&r=${Math.random()}`
+    : `${API_BASE}?server=${SERVER}&type=song&id=${id}&r=${Math.random()}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if(!data || !data[0]) throw new Error('empty response');
+  return data[0];
+}
+
+async function initWithMeting(){
+  setFxStatus('AUDIO FIELD: FETCHING TRACKS…', '');
+  npTitle.textContent  = 'LOADING…';
+  npArtist.textContent = 'METING API';
+
+  let raw;
+  try {
+    raw = await Promise.all(SONG_IDS.map(id => fetchSong(id, false)));
+  } catch(e){
+    console.warn('Primary Meting API failed, trying fallback…', e);
+    try {
+      raw = await Promise.all(SONG_IDS.map(id => fetchSong(id, true)));
+    } catch(e2){
+      console.error('Both Meting APIs failed:', e2);
+      setFxStatus('AUDIO FIELD: API FAILED — LOAD LOCAL FILES', 'warn');
+      npTitle.textContent  = '— API UNAVAILABLE —';
+      npArtist.textContent = 'USE LOCAL UPLOAD BELOW';
+      renderList();
+      return;
+    }
+  }
+
+  /* Convert Meting response to our SONGS format */
+  raw.forEach((s, i) => {
+    SONGS.push({
+      id:       'meting-' + (s.id || i),
+      title:    s.name   || '未知曲目',
+      artist:   s.artist || '未知艺术家',
+      duration: '--:--',
+      src:      s.url    || '',
+      cover:    s.pic    || '',
+    });
+  });
+
+  setFxStatus('AUDIO FIELD: TRACKS LOADED', 'live');
+  load(0, false);
+  renderList();
+}
+
 /* ── Init ── */
-load(0, false);
-renderList();
+initWithMeting();
+
+/* ── Local file upload ── */
+const fileInput = document.getElementById('file-input');
+
+fileInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  if(files.length === 0) return;
+
+  files.forEach(file => {
+    if(!file.type.startsWith('audio/')) return;
+
+    const url = URL.createObjectURL(file);
+    const name = file.name.replace(/\.[^/.]+$/, ''); // 移除扩展名
+
+    // 添加到播放列表
+    SONGS.push({
+      id: 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+      title: name,
+      artist: '本地文件',
+      duration: '--:--',
+      src: url,
+      cover: '',
+      isLocal: true
+    });
+  });
+
+  renderList();
+  setFxStatus(`已添加 ${files.length} 个本地文件`, 'live');
+
+  // 清空 input 以便再次选择相同文件
+  fileInput.value = '';
+});
 
 })();
 </script>
 
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"8adc99322e33480c8b9632a9d4a34c44","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"7939e04a4baf43c8b86a560f74aac60e","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"8adc99322e33480c8b9632a9d4a34c44","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
