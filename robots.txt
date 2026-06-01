@@ -1,4 +1,4 @@
 User-agent:*
 Disallow:
 
-Sitemap: https://LSGE271828.github.io/sitemap.xml
+Sitemap: https://LSGE271828.github.io/LSGE271828.github.io/sitemap.xml
