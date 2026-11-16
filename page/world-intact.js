@@ -33,7 +33,7 @@ totalEmissiveRadiance+=(vec3(.12,.65,1.)*horizontal+vec3(1.,.18,.55)*vertical)*1
  };return m;
 }
 async function prepareGlyphs(){
- try{const [{createIllustratedCharacter},url]=await Promise.all([import('./illustrated-character.js?v=20261116-pointer'),window.heroAssets.image()]);
+ try{const [{createIllustratedCharacter},url]=await Promise.all([import('./illustrated-character.js?v=20261116-underpaint35'),window.heroAssets.image()]);
  illustrated=await createIllustratedCharacter(url);illustrated.group.position.set(3.6,2.775,0);illustrated.setMode('flow');scene.add(illustrated.group);resize();
  }catch(error){console.warn('Character text transition unavailable',error);}
 }

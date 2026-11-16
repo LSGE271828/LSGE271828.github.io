@@ -8,7 +8,7 @@ export async function createIllustratedCharacter(url) {
   const pixels=context.getImageData(0,0,image.width,image.height).data;
   const root=new THREE.Group();
   const imageTexture=new THREE.Texture(image);imageTexture.colorSpace=THREE.SRGBColorSpace;imageTexture.needsUpdate=true;
-  const uniforms={uTime:{value:0},uNight:{value:0},uReveal:{value:0},uPointer:{value:new THREE.Vector2(20,20)},uViewport:{value:new THREE.Vector2(1,1)},uTransition:{value:1},uFlatten:{value:1},uScan:{value:-.2},uLineStrength:{value:0},uUnderpaint:{value:.28}};
+  const uniforms={uTime:{value:0},uNight:{value:0},uReveal:{value:0},uPointer:{value:new THREE.Vector2(20,20)},uViewport:{value:new THREE.Vector2(1,1)},uTransition:{value:1},uFlatten:{value:1},uScan:{value:-.2},uLineStrength:{value:0},uUnderpaint:{value:.35}};
 
   // An actual font atlas: each quad renders a letter, not a soft particle.
   const alphabet='.:,-=+*/sintohmeS0O8BWM#@',tile=64,atlasColumns=8;
@@ -116,7 +116,7 @@ export async function createIllustratedCharacter(url) {
       uniforms.uPointer.value.set(pointer.x,-pointer.y);
       const host=document.getElementById('world');uniforms.uViewport.value.set(host.clientWidth,host.clientHeight);
       if(currentMode==='flow')root.quaternion.identity().slerp(camera.quaternion,THREE.MathUtils.smoothstep(flatten,.1,1)*transition);else root.quaternion.copy(camera.quaternion);
-      uniforms.uUnderpaint.value=currentMode==='line'?.065:.28;
+      uniforms.uUnderpaint.value=currentMode==='line'?.065:.35;
       uniforms.uLineStrength.value=currentMode==='flow'?Math.sin(Math.PI*transition)*.8+((scan>-.1&&scan<1.1)?.35:0):(currentMode==='line'?1:0);
       lines.visible=(currentMode==='line'||currentMode==='flow')&&uniforms.uLineStrength.value>.005;
     },count:bases.length};

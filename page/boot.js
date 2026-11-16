@@ -6,5 +6,5 @@ async function resource(name){
 }
 window.heroAssets={model:resource('character.glb'),image:()=>resource('character.png')};
 document.body.classList.add('sculpture');
-try {await import('./world-intact.js?v=20261116-short-hold');}
+try {await import('./world-intact.js?v=20261116-underpaint35');}
 catch(error){console.error('Hero scene unavailable',error);dispatchEvent(new Event('worldfailed'));}
