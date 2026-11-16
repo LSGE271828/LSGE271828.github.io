@@ -6,4 +6,4 @@ async function resource(name){
 const [model,image]=await Promise.all([resource('character.glb'),resource('character.png')]);window.heroAssets={model,image};
 document.body.classList.add('sculpture');
 try {await import('./world-flow.js');}
-catch(error){console.error('Hero scene unavailable',error);document.body.classList.remove('sculpture');document.getElementById('status-text').textContent='原画预览';window.dispatchEvent(new Event('worldfailed'));}
+catch(error){console.error('Hero scene unavailable',error);document.body.classList.remove('sculpture');window.dispatchEvent(new Event('worldfailed'));}

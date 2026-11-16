@@ -11,20 +11,20 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const host=document.getElementById('world'),status=document.getElementById('status-text');
+const host=document.getElementById('world');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.domElement.tabIndex=0;renderer.domElement.setAttribute('aria-label','白雾人物从立体经光带描摹逐渐转成流动字符');host.append(renderer.domElement);
-host.setAttribute('aria-label','雾白立体到原画字符的一体流变场景');
+renderer.domElement.tabIndex=0;renderer.domElement.setAttribute('aria-label','暮色中的人物模型');host.append(renderer.domElement);
+host.setAttribute('aria-label','暮色中的人物模型');
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0xe4e1ed,.027);
 const environment=new RoomEnvironment(),pmrem=new THREE.PMREMGenerator(renderer),env=pmrem.fromScene(environment,.025);
 scene.environment=env.texture;environment.dispose();pmrem.dispose();
 const camera=new THREE.PerspectiveCamera(39,1,.1,180),controls=new OrbitControls(camera,renderer.domElement);
 Object.assign(controls,{enableDamping:true,dampingFactor:.055,enablePan:false,minDistance:6,maxDistance:25,minPolarAngle:.4,maxPolarAngle:1.48,enabled:false});
 const home=new THREE.Vector3(),focus=new THREE.Vector3(),pointer=new THREE.Vector2(),center=new THREE.Vector3(3.6,2.78,0);
-let mobile=false,mode='parallax',night=0,targetNight=0,time=0,entry=0;
+let mobile=false,mode='parallax',night=1,targetNight=1,time=0,entry=0;
 let flowClock=window.worldUI.paused?8.2:-1.1,lastPhase=-1;
 const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(1,1),.12,.4,1.6));composer.addPass(new OutputPass());
@@ -42,16 +42,7 @@ const blue=new THREE.PointLight(0x75dfff,22,25,2);blue.position.set(-1,2,4);scen
 const landscape=createMistEnvironment(scene);
 const modelRoot=new THREE.Group();modelRoot.position.set(3.6,.6,0);modelRoot.rotation.y=Math.PI*1.5;scene.add(modelRoot);
 let illustrated=null,character=null,modelPromise=null,ready=false;
-const phaseNames=['雾白立体','光带描摹','形体流变','字符流动'];
-const captions=['先有形，后有文字。','沿着轮廓，留下微光。','由形入字，缓缓流动。','原画，流成一行行文字。'];
-function updateCaption(phase){
- if(phase===lastPhase)return;lastPhase=phase;host.dataset.flowPhase=String(phase);
- document.querySelector('.scene-caption b').textContent=captions[phase];
- document.querySelector('.scene-caption div>span').textContent='VOLUME → LIGHT → INK';
- document.getElementById('flow-phase').textContent=`0${phase+1} / ${phaseNames[phase]}`;
- for(const marker of document.querySelectorAll('[data-flow-step]'))marker.classList.toggle('current',Number(marker.dataset.flowStep)===phase);
- status.textContent=phaseNames[phase]+' · 同一段流变';
-}
+function updateCaption(phase){if(phase===lastPhase)return;lastPhase=phase;host.dataset.flowPhase=String(phase);}
 function markReady(){if(ready)return;ready=true;renderer.compile(scene,camera);document.body.classList.add('ready');window.dispatchEvent(new Event('worldready'));}
 function ensureModel(){
  if(modelPromise)return modelPromise;
@@ -74,7 +65,7 @@ const imagePromise=createIllustratedCharacter(window.heroAssets.image).then(resu
 });
 Promise.allSettled([imagePromise,ensureModel()]).then(results=>{
  for(const result of results)if(result.status==='rejected')console.error('Portrait flow asset failed',result.reason);
- if(illustrated&&character){updateCaption(0);markReady();}else if(illustrated){flowClock=8.2;markReady();}else if(character){markReady();status.textContent='原画暂不可用 · 立体人物预览';}else{document.body.classList.remove('sculpture');window.dispatchEvent(new Event('worldfailed'));}
+ if(illustrated&&character){updateCaption(0);markReady();}else if(illustrated){flowClock=8.2;markReady();}else if(character){markReady();}else{document.body.classList.remove('sculpture');window.dispatchEvent(new Event('worldfailed'));}
 });
 addEventListener('worldchange',event=>{
  targetNight=event.detail.night?1:0;
@@ -102,9 +93,6 @@ renderer.setAnimationLoop(now=>{
  const scan=flowClock<2.4?-.2:(flowClock<4.4?THREE.MathUtils.mapLinear(flowClock,2.4,4.4,-.15,1.15):morph*1.3-.15);
  const phase=flowClock<2.4?0:(flowClock<4.4?1:(flowClock<8?2:3));
  if(ready)updateCaption(phase);
- const flowProgress=THREE.MathUtils.clamp(flowClock/8,0,1);
- document.getElementById('flow-progress').style.transform=`scaleX(${flowProgress})`;
- document.querySelector('.flow-track').setAttribute('aria-valuenow',String(Math.round(flowProgress*100)));
  night=THREE.MathUtils.damp(night,targetNight,3,dt);landscape.update(time,night);
  scene.fog.density=.027+Math.sin(Math.PI*morph)*.005;
  hemi.intensity=2.2-night;key.intensity=3+night*.8;rose.intensity=24+night*45;blue.intensity=22+night*40;
