@@ -5,5 +5,5 @@ async function resource(name){
 }
 window.heroAssets={model:await resource('character.glb'),image:()=>resource('character.png')};
 document.body.classList.add('sculpture');
-try {await import('./world-flow.js');}
+try {await import('./world-flow.js?v=20261116-pointer');}
 catch(error){console.error('Hero scene unavailable',error);document.body.classList.remove('sculpture');window.dispatchEvent(new Event('worldfailed'));}

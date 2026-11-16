@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { createSlicedCharacter } from './sliced-character.js';
-import { createIllustratedCharacter } from './illustrated-character.js';
+import { createIllustratedCharacter } from './illustrated-character.js?v=20261116-pointer';
 import { createMistEnvironment } from './mist-environment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
