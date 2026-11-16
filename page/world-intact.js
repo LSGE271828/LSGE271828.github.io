@@ -45,7 +45,7 @@ function resize(){const mobile=host.clientWidth<700;const scale=mobile?Math.min(
 host.onpointermove=e=>{pointerActive=true;const r=host.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1);};host.onpointerleave=()=>{pointerActive=false;pointer.set(0,0);};
 let previous=performance.now();renderer.setAnimationLoop(now=>{const dt=Math.min((now-previous)/1000,.05);previous=now;if(document.hidden||window.heroOffscreen)return;if(!paused&&window.worldRevealed)time+=dt;
  if(illustrated&&window.worldRevealed&&!paused)flowTime+=dt;
- const morph=illustrated?THREE.MathUtils.smoothstep(flowTime,2.4,5.3):0;
+ const morph=illustrated?THREE.MathUtils.smoothstep(flowTime,2.4,3.85):0;
  flowUniforms.uTime.value=time;flowUniforms.uMorph.value=morph;
  root.visible=morph<.9999;host.dataset.flowPhase=morph===0?'model':morph<1?'transition':'characters';
  if(illustrated){illustrated.group.position.y=.6+2.175*root.scale.y;illustrated.update(time,1,1,pointerActive&&!paused?pointer:inactivePointer,camera,morph,morph,morph*1.3-.15);}
