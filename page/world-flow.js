@@ -24,6 +24,7 @@ scene.environment=env.texture;environment.dispose();pmrem.dispose();
 const camera=new THREE.PerspectiveCamera(39,1,.1,180),controls=new OrbitControls(camera,renderer.domElement);
 Object.assign(controls,{enableDamping:true,dampingFactor:.055,enablePan:false,minDistance:6,maxDistance:25,minPolarAngle:.4,maxPolarAngle:1.48,enabled:false});
 const home=new THREE.Vector3(),focus=new THREE.Vector3(),pointer=new THREE.Vector2(),center=new THREE.Vector3(3.6,2.78,0);
+let pointerActive=false;
 let mobile=false,mode='parallax',night=1,targetNight=1,time=0,entry=0;
 let flowClock=window.worldUI.paused?8.2:-1.1,lastPhase=-1;
 const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
@@ -55,12 +56,12 @@ function ensureModel(){
    character.uniforms.uDeconstruct.value=0;
    const geometries=new Set(),materials=new Set();model.traverse(obj=>{if(obj.isMesh){geometries.add(obj.geometry);for(const m of(Array.isArray(obj.material)?obj.material:[obj.material]))materials.add(m);}});
    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
-   renderer.compile(scene,camera);resolve(character);
+   renderer.compile(scene,camera);markReady();resolve(character);
   }catch(error){reject(error);}
  },undefined,reject));
  return modelPromise;
 }
-const imagePromise=createIllustratedCharacter(window.heroAssets.image).then(result=>{
+const imagePromise=ensureModel().then(async()=>createIllustratedCharacter(await window.heroAssets.image())).then(result=>{
  illustrated=result;result.group.position.copy(center);result.setMode('flow');scene.add(result.group);return result;
 });
 Promise.allSettled([imagePromise,ensureModel()]).then(results=>{
@@ -76,8 +77,8 @@ addEventListener('flowreplay',()=>{flowClock=0;lastPhase=-1;});
 const keys=new Set(),destination=new THREE.Vector3(),look=new THREE.Vector3(),inactivePointer=new THREE.Vector2(20,20);
 function reset(){pointer.set(0,0);camera.position.copy(home);controls.target.copy(focus);camera.lookAt(focus);}
 addEventListener('worldreset',reset);
-host.addEventListener('pointermove',event=>{if(event.pointerType==='touch')return;const rect=host.getBoundingClientRect();pointer.set((event.clientX-rect.left)/rect.width*2-1,(event.clientY-rect.top)/rect.height*2-1);});
-host.addEventListener('pointerleave',()=>pointer.set(0,0));
+host.addEventListener('pointermove',event=>{if(event.pointerType==='touch')return;pointerActive=true;const rect=host.getBoundingClientRect();pointer.set((event.clientX-rect.left)/rect.width*2-1,(event.clientY-rect.top)/rect.height*2-1);});
+host.addEventListener('pointerleave',()=>{pointerActive=false;pointer.set(0,0);});
 addEventListener('keydown',event=>{if(mode==='explore'&&['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)){keys.add(event.key);event.preventDefault();}});
 addEventListener('keyup',event=>keys.delete(event.key));addEventListener('blur',()=>keys.clear());
 const forward=new THREE.Vector3(),right=new THREE.Vector3(),move=new THREE.Vector3();
@@ -87,7 +88,7 @@ renderer.setAnimationLoop(now=>{
  const dt=Math.min((now-previous)/1000,.05);previous=now;if(document.hidden||window.heroOffscreen)return;
  const paused=window.worldUI.paused;if(!paused)time+=dt;
  if(window.worldRevealed)entry=THREE.MathUtils.damp(entry,1,2.6,dt);
- if(ready&&window.worldRevealed&&!paused)flowClock=Math.min(8.2,flowClock+dt);
+ if(ready&&illustrated&&window.worldRevealed&&!paused)flowClock=Math.min(8.2,flowClock+dt);
  const morph=illustrated?THREE.MathUtils.smoothstep(flowClock,4.4,8):0;
  const flatten=THREE.MathUtils.smoothstep(flowClock,3.2,7.8);
  const scan=flowClock<2.4?-.2:(flowClock<4.4?THREE.MathUtils.mapLinear(flowClock,2.4,4.4,-.15,1.15):morph*1.3-.15);
@@ -100,7 +101,7 @@ renderer.setAnimationLoop(now=>{
   const px=paused?0:pointer.x,py=paused?0:pointer.y;destination.copy(home);destination.x+=px*.75*(1-flatten*.72);destination.y-=py*.35*(1-flatten*.6);destination.z+=(1-entry)*.8-flatten*(mobile?.35:.65);
   camera.position.lerp(destination,1-Math.exp(-dt*3));look.copy(focus);look.x+=px*.12;camera.lookAt(look);
  }else{navigate(dt);controls.update();}
- if(illustrated){illustrated.group.scale.setScalar(mobile?.94:1);illustrated.update(time,night,entry,paused?inactivePointer:pointer,camera,morph,flatten,scan);}
+ if(illustrated){illustrated.group.scale.setScalar(mobile?.94:1);illustrated.update(time,night,entry,paused||!pointerActive?inactivePointer:pointer,camera,morph,flatten,scan);}
  const modelScale=mobile?.94:1;modelRoot.scale.set(modelScale*(1-flatten*.96),modelScale,modelScale);modelRoot.position.y=.6+Math.sin(time*.65)*.022*(1-morph);
  modelRoot.visible=!!character&&morph<.9999;
  if(character){character.uniforms.uNight.value=night;character.uniforms.uMorph.value=morph;character.uniforms.uScan.value=scan;}

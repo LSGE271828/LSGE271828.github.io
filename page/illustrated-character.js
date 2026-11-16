@@ -8,7 +8,7 @@ export async function createIllustratedCharacter(url) {
   const pixels=context.getImageData(0,0,image.width,image.height).data;
   const root=new THREE.Group();
   const imageTexture=new THREE.Texture(image);imageTexture.colorSpace=THREE.SRGBColorSpace;imageTexture.needsUpdate=true;
-  const uniforms={uTime:{value:0},uNight:{value:0},uReveal:{value:0},uPointer:{value:new THREE.Vector2(20,20)},uTransition:{value:1},uFlatten:{value:1},uScan:{value:-.2},uLineStrength:{value:0},uUnderpaint:{value:.28}};
+  const uniforms={uTime:{value:0},uNight:{value:0},uReveal:{value:0},uPointer:{value:new THREE.Vector2(20,20)},uViewport:{value:new THREE.Vector2(1,1)},uTransition:{value:1},uFlatten:{value:1},uScan:{value:-.2},uLineStrength:{value:0},uUnderpaint:{value:.28}};
 
   // An actual font atlas: each quad renders a letter, not a soft particle.
   const alphabet='.:,-=+*/sintohmeS0O8BWM#@',tile=64,atlasColumns=8;
@@ -41,7 +41,7 @@ export async function createIllustratedCharacter(url) {
   const glyphMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
     uniforms:{...uniforms,uAtlas:{value:atlasTexture},uCell:{value:new THREE.Vector2(cellWidth*1.15,cellHeight*1.2)}},
     vertexShader:`
-      uniform float uTime,uReveal,uTransition,uFlatten;uniform vec2 uPointer,uCell;
+      uniform float uTime,uReveal,uTransition,uFlatten;uniform vec2 uPointer,uCell,uViewport;
       attribute vec3 aCenter,aColor;attribute float aBase,aPhase,aAlpha;
       varying vec2 vUv;varying vec3 vColor;varying float vGlyph,vAlpha;
       void main(){
@@ -52,7 +52,10 @@ export async function createIllustratedCharacter(url) {
         float wave=sin(center.y*3.5+uTime*.75+center.x*.7);
         center.x+=(wave*.045+sin(uTime*.4+phase)*.008)*converted;
         center.y+=sin(center.x*2.-uTime*.65)*.028*converted;
-        vec2 delta=center.xy-uPointer;float distance=length(delta);
+        // Match the cursor against projected glyphs in screen pixels, including camera parallax.
+        vec4 projected=projectionMatrix*modelViewMatrix*vec4(center,1.);
+        vec2 delta=(projected.xy/projected.w-uPointer)*uViewport*.5;
+        float distance=length(delta)/90.;
         center.xy+=normalize(delta+vec2(.0001))*exp(-distance*distance*1.5)*.065*sin(uTime*1.6-distance*4.);
         center.z+=wave*.035*converted;
         vec3 p=center+vec3(position.xy*uCell,0.);
@@ -110,7 +113,8 @@ export async function createIllustratedCharacter(url) {
     update(time,night,reveal,pointer,camera,transition=1,flatten=1,scan=-.2){
       uniforms.uTime.value=time;uniforms.uNight.value=night;uniforms.uReveal.value=reveal;
       uniforms.uTransition.value=transition;uniforms.uFlatten.value=flatten;uniforms.uScan.value=scan;
-      uniforms.uPointer.value.set(pointer.x*3.4,-pointer.y*2.3);
+      uniforms.uPointer.value.set(pointer.x,-pointer.y);
+      const host=document.getElementById('world');uniforms.uViewport.value.set(host.clientWidth,host.clientHeight);
       if(currentMode==='flow')root.quaternion.identity().slerp(camera.quaternion,THREE.MathUtils.smoothstep(flatten,.1,1)*transition);else root.quaternion.copy(camera.quaternion);
       uniforms.uUnderpaint.value=currentMode==='line'?.065:.28;
       uniforms.uLineStrength.value=currentMode==='flow'?Math.sin(Math.PI*transition)*.8+((scan>-.1&&scan<1.1)?.35:0):(currentMode==='line'?1:0);
