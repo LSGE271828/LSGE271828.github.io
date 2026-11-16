@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sinthome</title>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/"}}</script>
 <link rel="stylesheet" href="./style.css">
 <link rel="modulepreload" href="./vendor/three.module.js">
-<link rel="modulepreload" href="./world-intact.js?v=20261116-flow-fast">
+<link rel="modulepreload" href="./world-intact.js?v=20261116-importfix">
 <link rel="preconnect" href="https://xss-271828.oss-cn-beijing.aliyuncs.com" crossorigin>
-<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/"}}</script>
 <link rel="stylesheet" href="./opening.css"><style>#skip-opening{background:transparent;color:inherit;border:0;cursor:pointer}.opening-word{animation:arrival .3s ease both}@keyframes arrival{from{opacity:0;transform:translate(-50%,-50%) rotate(-90deg) scale(.7)}to{opacity:1;transform:translate(-50%,-50%) rotate(0) scale(1)}}</style></head>
 <body class="night opening"><div id="opening" class="opening-shell" role="status" aria-label="loading"><div class="opening-panel panel-left"></div><div class="opening-panel panel-right"></div><div class="opening-grid"></div><div class="opening-geometry geometry-square"></div><div class="opening-geometry geometry-circle"></div><div class="opening-word">Sinthome<span>.</span></div><div class="opening-bottom"><span id="opening-status">loading</span><button id="skip-opening" type="button">跳过</button></div></div>
 <main>
@@ -21,5 +21,5 @@
 </section>
 </main>
 <script src="./ui.js"></script>
-<script src="./loading-opening.js?v=20261116-flow-fast"></script><script type="module" src="./boot.js?v=20261116-flow-fast"></script>
+<script src="./loading-opening.js?v=20261116-importfix"></script><script type="module" src="./boot.js?v=20261116-importfix"></script>
 </body></html>
